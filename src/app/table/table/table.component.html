@@ -1,0 +1,60 @@
+<form>
+  <input
+    type="text"
+    class="form-control"
+    id="filterControl"
+    placeholder="Filter"
+    [formControl]="filterControl"
+  />
+</form>
+
+<table cdk-table [dataSource]="data" class="table">
+  @for (col of _columns; let index=$index; track index) {
+  <ng-container [cdkColumnDef]="col.column">
+    @switch (col.type) { @case(colTypes.checkbox) {
+    <th cdk-header-cell *cdkHeaderCellDef>
+      <div class="form-check">
+        <input
+          type="checkbox"
+          class="form-check-input border-secondary"
+          [id]="col.column"
+          *ngIf="data.selectAllControl"
+          [formControl]="data.selectAllControl"
+        />
+      </div>
+    </th>
+    <td cdk-cell *cdkCellDef="let row; let i = index">
+      <div class="form-check">
+        <input
+          *ngIf="data.getSelectControl(row.id)"
+          type="checkbox"
+          class="form-check-input border-secondary"
+          [id]="col.column + i"
+          [formControl]="data.getSelectControl(row.id)"
+        />
+      </div>
+    </td>
+    } @default {
+
+    <th cdk-header-cell *cdkHeaderCellDef (click)="adjustSort(col)">
+      {{ col.column }}
+      @if (sortCol$.value === col.column) {
+      <i
+        class="bi"
+        [ngClass]="{
+          'bi-chevron-up': sortDirection$.value === sortDirections.asc,
+          'bi-chevron-down': sortDirection$.value === sortDirections.desc
+        }"
+      ></i>
+      }
+    </th>
+    <td cdk-cell *cdkCellDef="let row">
+      {{ row[col.column] }}
+    </td>
+    } }
+  </ng-container>
+  }
+
+  <tr cdk-header-row *cdkHeaderRowDef="getColumnNames()"></tr>
+  <tr cdk-row *cdkRowDef="let row; columns: getColumnNames()"></tr>
+</table>
