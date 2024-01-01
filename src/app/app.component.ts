@@ -45,6 +45,7 @@ export interface TableActionEvent extends ActionEvent {
   imports: [CommonModule, RouterOutlet, TableComponent],
   styleUrls: ['./app.component.scss'],
   template: `
+    <button (click)="dataSource.clearSelectedItems()">clear</button>
     <app-table
       [data]="dataSource"
       [columns]="columns"
@@ -93,9 +94,7 @@ export class AppComponent {
   ];
 
   constructor() {
-    this.dataSource
-      .getSelectedItems$()
-      .subscribe((items) => console.log(items));
+    this.dataSource.selectedItems$.subscribe((items) => console.log(items));
   }
 
   eventHandler(event: ActionEvent): void {

@@ -193,8 +193,8 @@ export class TableDataSource<T> implements DataSource<T> {
 
   private _config: TableConfig = {};
 
-  private selectedItems$ = new BehaviorSubject<T[]>([]);
-  private selectedItems = new Set<number>();
+  private _selectedItems$ = new BehaviorSubject<T[]>([]);
+  private _selectedItems = new Set<number>();
 
   selectRowArray = new FormArray<AbstractControl<any, any>>([]);
   selectRowSub!: Subscription;
@@ -229,7 +229,7 @@ export class TableDataSource<T> implements DataSource<T> {
       .subscribe(([values, data]) => {
         const allSelected = values.every((val) => val);
 
-        this.selectedItems$.next(
+        this._selectedItems$.next(
           values.flatMap((v, i) => (v ? data.at(i) ?? [] : []))
         );
 
@@ -240,12 +240,16 @@ export class TableDataSource<T> implements DataSource<T> {
         }
       });
 
-    this.selectAllControl.valueChanges.subscribe((value) => {
-      this.selectRowArray.patchValue(
-        new Array(this.selectRowArray.controls.length).fill(value),
-        { emitEvent: false }
-      );
-    });
+    this.selectAllControl.valueChanges
+      .pipe(withLatestFrom(this.dataSubject))
+      .subscribe(([value, data]) => {
+        this._selectedItems$.next(value ? data : []);
+
+        this.selectRowArray.patchValue(
+          new Array(this.selectRowArray.controls.length).fill(value),
+          { emitEvent: false }
+        );
+      });
   }
 
   connect(collectionViewer: CollectionViewer): Observable<T[]> {
@@ -255,7 +259,7 @@ export class TableDataSource<T> implements DataSource<T> {
   disconnect(collectionViewer: CollectionViewer): void {
     this.dataSubject.complete();
     this.loadingSubject.complete();
-    this.selectedItems$.complete();
+    this._selectedItems$.complete();
     this._sortSubject.complete();
     this._filterSubject.complete();
     if (this.subscriber) {
@@ -338,7 +342,7 @@ export class TableDataSource<T> implements DataSource<T> {
     data.map((item: any) => {
       return this.selectRowArray.push(
         new FormControl(
-          this.selectedItems.has(item.id) ?? this._config.select?.default
+          this._selectedItems.has(item.id) ?? this._config.select?.default
         )
       );
     });
@@ -348,16 +352,20 @@ export class TableDataSource<T> implements DataSource<T> {
     return this.selectRowArray.controls[index] as FormControl;
   }
 
-  getSelectedItems() {
+  get selectedItems() {
     return this._filterData(
-      this.selectedItems$.value,
+      this._selectedItems$.value,
       this._filterSubject.value
     );
   }
 
-  getSelectedItems$(): Observable<T[]> {
-    return combineLatest([this.selectedItems$, this._filterSubject]).pipe(
+  get selectedItems$(): Observable<T[]> {
+    return combineLatest([this._selectedItems$, this._filterSubject]).pipe(
       map(([selectedItems, filter]) => this._filterData(selectedItems, filter))
     );
+  }
+
+  clearSelectedItems(): void {
+    this.selectAllControl.setValue(false);
   }
 }
