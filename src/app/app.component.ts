@@ -1,4 +1,4 @@
-import { Component, Signal, signal } from '@angular/core';
+import { Component, Signal, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterOutlet } from '@angular/router';
 import { ELEMENT_DATA, PeriodicElement } from './test-data/test.data';
@@ -7,6 +7,9 @@ import {
   TableConfig,
   TableDataSource,
 } from './table/table/table.component';
+import { of } from 'rxjs';
+import { TestService } from './test-data/test.service';
+import { toObservable } from '@angular/core/rxjs-interop';
 
 export enum ColType {
   data = 'data',
@@ -58,6 +61,7 @@ export class AppComponent {
   title = 'ng-table';
 
   data = signal<PeriodicElement[]>(ELEMENT_DATA);
+  testService = inject(TestService);
 
   tableConfig: TableConfig = {
     select: {
@@ -67,9 +71,18 @@ export class AppComponent {
     filter: {
       enabled: true,
     },
+    pagination: {
+      enabled: true,
+      callback: () => {
+        this.testService.pagination$.next();
+      },
+    },
   };
 
-  dataSource = new TableDataSource(this.data(), this.tableConfig);
+  dataSource = new TableDataSource(
+    toObservable(this.testService.data),
+    this.tableConfig
+  );
 
   columns: TableColumn[] = [
     {
@@ -94,7 +107,7 @@ export class AppComponent {
   ];
 
   constructor() {
-    this.dataSource.selectedItems$.subscribe((items) => console.log(items));
+    // this.dataSource.selectedItems$.subscribe((items) => console.log(items));
   }
 
   eventHandler(event: ActionEvent): void {

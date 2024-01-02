@@ -1,51 +1,39 @@
-import {
-  Component,
-  EventEmitter,
-  Input,
-  Output,
-  Signal,
-  SimpleChanges,
-  inject,
-} from '@angular/core';
+import { Component, EventEmitter, Input, Output, inject } from '@angular/core';
 import { CdkTableModule, DataSource } from '@angular/cdk/table';
 import {
   BehaviorSubject,
   Observable,
-  Subject,
   Subscription,
-  catchError,
   combineLatest,
-  debounceTime,
   filter,
-  finalize,
   isObservable,
   map,
   of,
   tap,
   withLatestFrom,
 } from 'rxjs';
-import {
-  ActionEvent,
-  ColType,
-  TableActionEvent,
-  TableColumn,
-} from '../../app.component';
+import { ColType, TableActionEvent, TableColumn } from '../../app.component';
 import {
   AbstractControl,
   FormArray,
   FormBuilder,
   FormControl,
-  FormGroup,
   ReactiveFormsModule,
 } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { CollectionViewer } from '@angular/cdk/collections';
+import { InfiniteScrollModule } from 'ngx-infinite-scroll';
 
 @Component({
   selector: 'app-table',
   standalone: true,
-  imports: [CdkTableModule, ReactiveFormsModule, CommonModule],
+  imports: [
+    CdkTableModule,
+    ReactiveFormsModule,
+    CommonModule,
+    InfiniteScrollModule,
+  ],
   templateUrl: './table.component.html',
   styleUrl: './table.component.scss',
 })
@@ -84,16 +72,6 @@ export class TableComponent<T> {
 
   pageSize$: BehaviorSubject<number> | undefined = undefined;
   currentPage$: BehaviorSubject<number> | undefined = undefined;
-
-  tableConfig: TableConfig = {
-    select: {
-      enabled: true,
-      default: false,
-    },
-    filter: {
-      enabled: true,
-    },
-  };
 
   constructor() {
     // TODO: Only create select controls when checkbox field is detected
@@ -175,6 +153,10 @@ export interface TableConfig {
     enabled: boolean;
     filterPredicate?: (...args: any[]) => boolean;
   };
+  pagination?: {
+    enabled: boolean;
+    callback: (...args: any[]) => void;
+  };
 }
 
 export class TableDataSource<T> implements DataSource<T> {
@@ -185,6 +167,7 @@ export class TableDataSource<T> implements DataSource<T> {
     direction: TableSortDirection.none,
   });
   private _filterSubject = new BehaviorSubject<string>('');
+  private _paginate = () => {};
 
   private source$: Observable<T[]>;
   private subscriber: Subscription;
@@ -202,6 +185,22 @@ export class TableDataSource<T> implements DataSource<T> {
   selectAllSub!: Subscription;
 
   constructor(source: T[] | Observable<T[]>, config?: TableConfig) {
+    this._config = config ?? this._config;
+
+    if (this._config.filter?.filterPredicate) {
+      this.filterPredicate = this._config.filter.filterPredicate;
+    }
+
+    if (this._config.pagination?.enabled) {
+      if (!isObservable(source)) {
+        throw new TypeError(
+          '[source] must be Observable<any> in order to use pagination'
+        );
+      }
+
+      this._paginate = this._config.pagination.callback;
+    }
+
     this.source$ = (isObservable(source) ? source : of(source)).pipe(
       tap((data: T[]) => this.createSelectArray(data)),
       map((data: T[]) =>
@@ -209,20 +208,16 @@ export class TableDataSource<T> implements DataSource<T> {
       )
     );
 
-    this._config = config ?? this._config;
+    this.subscriber = combineLatest([
+      this._filterSubject,
+      this._sortSubject,
+      this.source$,
+    ]).subscribe(([filter, sort, data]) => {
+      data = this._filterData(data, filter);
+      data = this._sortData(data, sort);
 
-    if (this._config.filter?.filterPredicate) {
-      this.filterPredicate = this._config.filter.filterPredicate;
-    }
-
-    this.subscriber = combineLatest([this._filterSubject, this._sortSubject])
-      .pipe(withLatestFrom(this.source$))
-      .subscribe(([[filter, sort], data]) => {
-        data = this._filterData(data, filter);
-        data = this._sortData(data, sort);
-
-        this.dataSubject.next(data);
-      });
+      this.dataSubject.next(data);
+    });
 
     this.selectRowArray.valueChanges
       .pipe(withLatestFrom(this.dataSubject))
@@ -287,6 +282,10 @@ export class TableDataSource<T> implements DataSource<T> {
     return this.dataSubject.value.length;
   }
 
+  get config(): TableConfig {
+    return this._config;
+  }
+
   private _sortData(data: T[], sort?: TableSort): T[] {
     if (!sort || !sort.col) {
       return data;
@@ -339,6 +338,10 @@ export class TableDataSource<T> implements DataSource<T> {
   createSelectArray(data: T[]) {
     this.selectRowArray.controls = [];
 
+    if (!data || !data.length) {
+      return;
+    }
+
     data.map((item: any) => {
       return this.selectRowArray.push(
         new FormControl(
@@ -367,5 +370,9 @@ export class TableDataSource<T> implements DataSource<T> {
 
   clearSelectedItems(): void {
     this.selectAllControl.setValue(false);
+  }
+
+  loadData(): void {
+    this._paginate();
   }
 }
