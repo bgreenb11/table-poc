@@ -1,22 +1,27 @@
-import { Component, Signal, inject, signal } from '@angular/core';
+import { Component, Signal, Type, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterOutlet } from '@angular/router';
 import { ELEMENT_DATA, PeriodicElement } from './test-data/test.data';
-import {
-  TableComponent,
-  TableConfig,
-  TableDataSource,
-} from './table/table/table.component';
+import { TableComponent, TableDataSource } from './table/table/table.component';
 import { of } from 'rxjs';
-import { TestService } from './test-data/test.service';
+import { GithubIssue, TestService } from './test-data/test.service';
 import { toObservable } from '@angular/core/rxjs-interop';
+import { TableConfig } from './table/table.models';
+import { FilterComponent } from './table/filter/filter.component';
+import DataCellComponent from './table/cells/data-cell.component';
+import ButtonCellComponent from './table/cells/button-cell.component';
+import GitHubRowCell from './table/cells/button-cell.component';
+import FormCellComponent from './table/cells/form-cell.component';
+import IconCellComponent from './table/cells/icon-cell.component';
+import KebabCellComponent from './table/cells/kebab-cell.component';
+import { ExpansionRowComponent } from './table/expansion-row/expansion-row.component';
 
 export enum ColType {
   data = 'data',
+  icon = 'icon',
   button = 'button',
   form = 'form',
   checkbox = 'checkbox',
-  dropdown = 'dropdown',
 }
 
 export interface Policy {
@@ -27,10 +32,14 @@ export interface Policy {
 export interface TableColumn {
   column: string;
   type: ColType;
+  component?: Type<any>;
   policy?: Policy;
-  styleClasses?: string;
+  styleClasses?: string[];
   default?: any;
   enableSorting?: boolean;
+  event?: string;
+  icon?: string;
+  readonly?: boolean;
 }
 
 export interface ActionEvent {
@@ -39,6 +48,7 @@ export interface ActionEvent {
 
 export interface TableActionEvent extends ActionEvent {
   index?: number;
+  row?: any;
   column?: string;
 }
 
@@ -53,6 +63,8 @@ export interface TableActionEvent extends ActionEvent {
       [data]="dataSource"
       [columns]="columns"
       [selectEnabled]="true"
+      [expansionComponent]="expansionRow"
+      [filterComponent]="filter"
       (actionEmitter)="eventHandler($event)"
     />
   `,
@@ -60,8 +72,9 @@ export interface TableActionEvent extends ActionEvent {
 export class AppComponent {
   title = 'ng-table';
 
-  data = signal<PeriodicElement[]>(ELEMENT_DATA);
   testService = inject(TestService);
+  expansionRow: Type<any> = ExpansionRowComponent;
+  filter: Type<any> = FilterComponent;
 
   tableConfig: TableConfig = {
     select: {
@@ -86,23 +99,45 @@ export class AppComponent {
 
   columns: TableColumn[] = [
     {
-      column: 'name',
-      type: ColType.data,
-      enableSorting: true,
+      column: 'kebab',
+      type: ColType.icon,
+      component: KebabCellComponent,
+      icon: 'bi-three-dots-vertical',
     },
     {
-      column: 'position',
-      type: ColType.data,
-      enableSorting: true,
+      column: 'icon',
+      type: ColType.icon,
+      component: IconCellComponent,
+      icon: 'bi-cart2',
+      styleClasses: ['fs-4'],
+      readonly: true,
     },
     {
-      column: 'weight',
+      column: 'created_at',
       type: ColType.data,
-      enableSorting: true,
+      component: DataCellComponent,
     },
     {
-      column: 'symbol',
+      column: 'number',
+      type: ColType.button,
+      component: GitHubRowCell,
+      event: 'navigateToRepo',
+      styleClasses: ['btn-link'],
+    },
+    {
+      column: 'state',
       type: ColType.data,
+      component: DataCellComponent,
+    },
+    {
+      column: 'title',
+      type: ColType.data,
+      component: DataCellComponent,
+    },
+    {
+      column: 'form',
+      type: ColType.form,
+      component: FormCellComponent,
     },
   ];
 
@@ -110,9 +145,15 @@ export class AppComponent {
     // this.dataSource.selectedItems$.subscribe((items) => console.log(items));
   }
 
-  eventHandler(event: ActionEvent): void {
+  eventHandler(event: TableActionEvent): void {
+    console.log(event);
+
     switch (event.action) {
       case 'selectAll': {
+        break;
+      }
+      case 'navigateToRepo': {
+        window.open(event.row.html_url);
       }
     }
   }

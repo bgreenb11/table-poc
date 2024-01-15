@@ -1,14 +1,6 @@
-<form>
-  <input
-    type="text"
-    class="form-control"
-    id="filterControl"
-    placeholder="Filter"
-    [formControl]="filterControl"
-  />
-</form>
-
-@if (data.config.pagination?.enabled) {
+@if (filterComponent) {
+<ng-container *ngComponentOutlet="filterComponent"></ng-container>
+} @if (data.config.pagination?.enabled) {
 <div
   infinite-scroll
   [infiniteScrollDistance]="1"
@@ -27,7 +19,7 @@
 }
 
 <ng-template #table let-data>
-  <table cdk-table [dataSource]="data" class="table">
+  <table cdk-table [dataSource]="data" class="table" multiTemplateDataRows>
     @for (col of _columns; let index=$index; track index) {
     <ng-container [cdkColumnDef]="col.column">
       @switch (col.type) { @case(colTypes.checkbox) {
@@ -42,17 +34,7 @@
           />
         </div>
       </th>
-      <td cdk-cell *cdkCellDef="let row; let i = index">
-        <div class="form-check">
-          <input
-            *ngIf="data.getSelectControl(row.id)"
-            type="checkbox"
-            class="form-check-input border-secondary"
-            [id]="col.column + i"
-            [formControl]="data.getSelectControl(row.id)"
-          />
-        </div>
-      </td>
+
       } @default {
 
       <th cdk-header-cell *cdkHeaderCellDef (click)="adjustSort(col)">
@@ -67,14 +49,95 @@
         ></i>
         }
       </th>
-      <td cdk-cell *cdkCellDef="let row">
-        {{ row[col.column] }}
-      </td>
+
       } }
+      <td cdk-cell *cdkCellDef="let row; let i = index">
+        @switch (col.type) { @case (colTypes.checkbox) {
+        <div class="form-check">
+          <input
+            *ngIf="data.getSelectControl(row.id)"
+            type="checkbox"
+            class="form-check-input border-secondary"
+            [id]="col.column + i"
+            [formControl]="data.getSelectControl(row.id)"
+          />
+        </div>
+        } @case (colTypes.button) {
+        <ng-container
+          *ngComponentOutlet="
+            col.component!;
+            inputs: {
+              display: row[col.column],
+              data: row,
+              classes: col.styleClasses,
+            };
+          "
+        />} @case (colTypes.form) {
+        <ng-container
+          *ngComponentOutlet="
+            col.component!;
+            inputs: {
+              data: row,
+              classes: col.styleClasses,
+            };
+          "
+        />
+        } @case (colTypes.icon) {
+        <ng-container
+          *ngComponentOutlet="
+            col.component!;
+            inputs: {
+              data: row,
+              icon: col.icon,
+              classes: col.styleClasses,
+              readonly: !!col.readonly
+            }
+          "
+        />
+        } @default {
+        <ng-container
+          *ngComponentOutlet="
+            col.component!;
+            inputs: {
+              data: row[col.column],
+              classes: col.styleClasses,
+            };
+          "
+        />
+        } }
+      </td>
     </ng-container>
     }
 
+    <ng-container cdkColumnDef="expandedDetail">
+      <td
+        cdkCell
+        *cdkCellDef="let row"
+        [attr.colspan]="getColumnNames().length"
+      >
+        <div
+          class="example-element-detail"
+          [@detailExpand]="row == expandedElement ? 'expanded' : 'collapsed'"
+        >
+          <ng-container
+            *ngComponentOutlet="expansionComponent!; inputs: { data: row }"
+          ></ng-container>
+        </div>
+      </td>
+    </ng-container>
+
     <tr cdk-header-row *cdkHeaderRowDef="getColumnNames()"></tr>
-    <tr cdk-row *cdkRowDef="let row; columns: getColumnNames()"></tr>
+    <tr
+      cdk-row
+      *cdkRowDef="let row; columns: getColumnNames()"
+      (click)="expandRow(row)"
+    ></tr>
+    @if (expansionComponent) {
+    <tr
+      cdk-row
+      *cdkRowDef="let row; columns: ['expandedDetail']"
+      class="expansionRow"
+    ></tr>
+    }
   </table>
 </ng-template>

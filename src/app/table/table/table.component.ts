@@ -1,4 +1,13 @@
-import { Component, EventEmitter, Input, Output, inject } from '@angular/core';
+import {
+  Component,
+  ContentChild,
+  EventEmitter,
+  Input,
+  Output,
+  TemplateRef,
+  Type,
+  inject,
+} from '@angular/core';
 import { CdkTableModule, DataSource } from '@angular/cdk/table';
 import {
   BehaviorSubject,
@@ -24,6 +33,19 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { CollectionViewer } from '@angular/cdk/collections';
 import { InfiniteScrollModule } from 'ngx-infinite-scroll';
+import {
+  TablePagination,
+  TableSortDirection,
+  TableSort,
+  TableConfig,
+} from '../table.models';
+import {
+  trigger,
+  state,
+  style,
+  transition,
+  animate,
+} from '@angular/animations';
 
 @Component({
   selector: 'app-table',
@@ -36,6 +58,16 @@ import { InfiniteScrollModule } from 'ngx-infinite-scroll';
   ],
   templateUrl: './table.component.html',
   styleUrl: './table.component.scss',
+  animations: [
+    trigger('detailExpand', [
+      state('collapsed,void', style({ height: '0px', minHeight: '0' })),
+      state('expanded', style({ height: '*' })),
+      transition(
+        'expanded <=> collapsed',
+        animate('225ms cubic-bezier(0.4, 0.0, 0.2, 1)')
+      ),
+    ]),
+  ],
 })
 export class TableComponent<T> {
   @Input({ required: true }) set columns(cols: TableColumn[]) {
@@ -43,6 +75,8 @@ export class TableComponent<T> {
   }
 
   @Input({ required: true }) data!: TableDataSource<T>;
+  @Input() expansionComponent: Type<any> | undefined = undefined;
+  @Input() filterComponent: Type<any> | undefined = undefined;
 
   @Input() pagination: TablePagination | undefined = undefined;
   @Input() selectEnabled: boolean = false;
@@ -55,6 +89,8 @@ export class TableComponent<T> {
 
   readonly colTypes = ColType;
   readonly sortDirections = TableSortDirection;
+
+  expandedElement: any | null;
 
   // source$ = new BehaviorSubject<T[]>([]);
   source$!: TableDataSource<T>;
@@ -114,49 +150,11 @@ export class TableComponent<T> {
     this.sortCol$.next(col.column);
     this.sortDirection$.next(TableSortDirection.asc);
   }
-}
 
-export enum TablePaginationType {
-  page = 'page',
-  scroll = 'scroll',
-}
-
-export interface TablePagination {
-  pageSize: number;
-  type: TablePaginationType;
-}
-
-export enum TableSortDirection {
-  asc = 'asc',
-  desc = 'desc',
-  none = '',
-}
-
-export interface TableSort {
-  col: string;
-  direction: TableSortDirection;
-}
-
-export enum TableEvents {
-  getSelectedItems = 'getSelectedItems',
-  resetSelectedItems = 'clearSelectedItems',
-  resetFilter = 'resetFilter',
-  reset = 'reset',
-}
-
-export interface TableConfig {
-  select?: {
-    enabled: boolean;
-    default?: boolean;
-  };
-  filter?: {
-    enabled: boolean;
-    filterPredicate?: (...args: any[]) => boolean;
-  };
-  pagination?: {
-    enabled: boolean;
-    callback: (...args: any[]) => void;
-  };
+  expandRow(row: any) {
+    this.expandedElement = this.expandedElement === row ? null : row;
+    console.log(row);
+  }
 }
 
 export class TableDataSource<T> implements DataSource<T> {
